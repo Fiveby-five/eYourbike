@@ -39,6 +39,12 @@ A set of tools to electrify your bike! Includes motor kit, battery kit, smart te
   
   对于**动能回收板**的设计，使用AC-DC-DC的方案，三相电经整流滤波后进入双向DC-DC电路，经过BUCK或BOOST后的电流回流进主控及电源管理板，再回流入电池充放电模块实现动能回收。同样由ESP32C3作为主控，通过配置MCU参数来确定不同的电压，以适应不同的电池组和电机。同时该板应具有电流控制功能，以控制进行动能回收时刹车的力度，这一功能直接通过软件实现（**TBD**）。  
   For**Energy Recycle Board**. Using an AC-DC-DC scheme: three-phase power is rectified and filtered, then fed into a bidirectional DC-DC converter. After buck/boost conversion, current flows back to the main control board and into the battery charge/discharge module. An ESP32-C3 acts as the controller, adjusting parameters to fit different battery packs and motors. It’ll also have current control to adjust braking force during Energy Recycle, implemented purely through software (TBD).  
+
+# 软件部分
+  每块电路板上均有一个MCU，分别具有不同的功能，总软件架构图如下。  
+  <img width="710" alt="{C0AA734E-62EA-47C2-82DF-CA57D2A1D70A}" src="https://github.com/user-attachments/assets/b4181596-98d3-4129-8d42-17358f2c7d4b" />  
+  通信使用UART通信  
+
   
   
   
