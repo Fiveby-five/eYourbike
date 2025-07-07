@@ -43,7 +43,9 @@ A set of tools to electrify your bike! Includes motor kit, battery kit, smart te
 # 软件部分
   每块电路板上均有一个MCU，分别具有不同的功能，总软件架构图如下。  
   <img width="710" alt="{C0AA734E-62EA-47C2-82DF-CA57D2A1D70A}" src="https://github.com/user-attachments/assets/b4181596-98d3-4129-8d42-17358f2c7d4b" />  
-  通信使用UART通信  
+  主控板软件架构图如下  
+  <img width="732" alt="{50F6CDDF-8119-4A18-9B81-573FA22050B8}" src="https://github.com/user-attachments/assets/e9fe9dc9-bd02-4f76-8439-eed1c0c8dcf9" />  
+
 
   
   
