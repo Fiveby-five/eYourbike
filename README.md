@@ -19,7 +19,8 @@ A full set for equip your bike. Including motor set, battery managing set, smart
   
 # 电气部分
   电气部分将是本项目的重点，首先是电池管理模块，考虑到安全性问题，我只会设计使用磷酸铁锂电池（LiFeP4)的电池模块，设计电压为36V和72V两种。  
-  以下是电气部分架构图：  <img width="730" alt="{1CC823F9-7E03-422D-958A-7BCBED5B54A1}" src="https://github.com/user-attachments/assets/89a6fc43-7e76-4989-8376-16e244eeaed3" />  
+  以上是电气部分架构图： 
+  <img width="730" alt="{1CC823F9-7E03-422D-958A-7BCBED5B54A1}" src="https://github.com/user-attachments/assets/89a6fc43-7e76-4989-8376-16e244eeaed3" />   
 
   对于**充放电模块**的设计，考虑到我没有独立设计开关电源的能力，因此我计划直接使用现成的开关电源提供DC供电，主控使用esp32C3，该MCU能够直接产生PWM信号调节充电占空比，且具有ADC引脚能够测量电压，使用厚膜电阻进行采样，低容量时使用恒流充电，接近充满时候使用恒压充电模式，且具有通信接口与平衡模块进行通信，通过串口与上位MCU通信。同时应具有温度监测功能，考虑到ESP32C3的I2C通道仅有一个，因此将使用I2C多路转换IC，以监控多个传感器。  
   
