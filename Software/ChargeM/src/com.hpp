@@ -2,6 +2,62 @@
 #include <vector>
 #include "freertos/semphr.h"
 
+#define H2Motor 0x00
+#define H2Battery 0x01
+#define H2Recycling 0x02
+#define H2Auxiliary 0x03
+#define M2HMS 0x04
+#define B2HMS 0x05
+#define R2HMS 0x06
+#define A2HMS 0x07
+#define HMS2SlaveE 0x09
+#define Slave2HMSE 0x0A 
+#define HMS2Error 0x0B
+
+#define HVCtrl 0x00
+#define HVBack 0x01
+#define HCSt 0x02
+#define HCSp 0x03
+#define HCBk 0x04
+#define HBStus 0x05
+#define HBalSt 0x06
+#define HRStus 0x07
+#define HRSt 0x08
+#define HRSp 0x09
+#define HAResp 0x0A
+
+#define HAllRst 0x10
+#define HEStop 0x11
+#define HMConstSet 0x12
+#define HBConstSet 0x13
+#define HRConstSet 0x14
+#define HAConstSet 0x15
+#define HAllDevSet 0x16
+#define HAllProSet 0x17
+
+#define MStus 0x20
+#define MConstBack 0x21
+#define MEmerg 0x22
+#define MDevBack 0x23
+
+#define BStus 0x30
+#define BConstBack 0x31
+#define BEmerg 0x32
+#define BDevBack 0x33
+
+#define RStus 0x40
+#define RConstBack 0x41
+#define REmerg 0x42
+#define RDevBack 0x43
+
+#define AStus 0x50
+#define AConstBack 0x51 
+#define AEmerg 0x52
+#define ADevBack 0x53
+
+
+
+
 /* Protocol define */
 /* Head 0xCC */
 /* Message type: 0x00 -- HMS to motor control
@@ -156,11 +212,20 @@ Odd verify : 1 byte
 class com{
     private:
         static SemaphoreHandle_t mutex;
-        static std::vector<byte> buffer;
         static uint8_t Channel;
-    public:
+    protected:
+        static std::vector<byte> buffer;
         static std::vector<byte> Command;
+        static uint8_t RxPin;
+        static uint8_t TxPin;
 
+        /**
+         * @brief Initialize. Channel default is 0
+         * 
+         * @param rxPin 
+         * @param txPin 
+         * @param SerialChannel 
+         */
         void init(uint8_t rxPin, uint8_t txPin , uint8_t SerialChannel = 0) {
             Serial.begin(115200, SERIAL_8N1, rxPin, txPin);
             Channel = 0;
@@ -168,13 +233,15 @@ class com{
                 Serial1.begin(115200, SERIAL_8N1, rxPin, txPin);
                 Channel = 1;
             }
+            mutex = xSemaphoreCreateMutex();
+            RxPin = rxPin;
+            TxPin = txPin;
         }
         /**
          * @brief Very simple verification. Simply calculate how many odd numbers in the command vector and return the sum.
          * 
          * @return byte 
          */
-
         byte OddVerify(std::vector<byte> &Cmd , uint16_t till = 0){
             uint sum = 0;
             for(uint8_t i = 0; i < Cmd.size() - till ; i++){
@@ -184,21 +251,7 @@ class com{
             return sum;
         }
 
-        void LoadCommand(std::vector<byte> &cmd){
-            if(xSemaphoreTake(mutex, portMAX_DELAY) != pdTRUE){
-                Serial.println("com: Failed to take mutex");
-                return;
-            }
-            Command.push_back(0xCC); // Head
-            for(uint8_t i = 0; i < cmd.size(); i++){
-                Command.push_back(cmd[i]);
-            }
-            Command.push_back(0xFF); // End
-            byte verify = OddVerify(Command);
-            Command.push_back(verify); // Verification
 
-            xSemaphoreGive(mutex);
-        }
 
         void SendCommand(){
             if(xSemaphoreTake(mutex, portMAX_DELAY) != pdTRUE){
@@ -216,7 +269,6 @@ class com{
                     Serial.println("com: Invalid channel");
                     break;
             }
-            Command.clear();
             xSemaphoreGive(mutex);
         }
 
@@ -278,9 +330,98 @@ class com{
             return true; // Data received and verified successfully
             xSemaphoreGive(mutex);
         }
+        public:
+        /**
+         * @brief Turn any type of data to byte array.
+         * 
+         * @tparam T 
+         * @param Value 
+         * @return uint8_t* 
+         */
+        template <typename T>
+            uint8_t* ToByte(T Value){
+                uint8_t* byteArray = new uint8_t[sizeof(T)];
+                memcpy(byteArray, &Value, sizeof(T));
+                return byteArray;
+            }
     };
 
     class AppllyOnProtocol: public com {
         private:
+            static SemaphoreHandle_t Amutex;
+        
         public:
+            std::vector<float> Recieve(uint8_t Info[3]){
+                if(!ReceiveCommand()) {
+                    Serial.println("com: Failed to receive command");
+                    return {};
+                }
+                std::vector<float> data;
+                if(xSemaphoreTake(Amutex, portMAX_DELAY) != pdTRUE){
+                    Serial.println("com: Failed to take mutex");
+                    return {};
+                }
+                if(buffer.size() < 5) {
+                    Serial.println("com: Buffer size is less than 5");
+                    xSemaphoreGive(Amutex);
+                    return {};
+                }
+                *Info = buffer[1]; // Message type
+                *(Info + 1) = buffer[2]; // Command
+                *(Info + 2) = buffer[3]; // Data length
+
+                for(uint8_t i = 4; i < buffer.size() - 2; i += 4) {
+                    float value;
+                    memcpy(&value, &buffer[i], sizeof(float));
+                    data.push_back(value);
+                }
+                buffer.clear(); // Clear the buffer after reading
+                xSemaphoreGive(Amutex);
+                return data; // Return the data read from the buffer
+            }
+
+            /**
+             * @brief Send data to slave or master. Universal function
+             * 
+             * @param type Refer to the macro definitions for message type
+             * @param Commands Refer to the macro definitions for command
+             * @param data Float data to send.
+             * @return true 
+             * @return false 
+             */
+            bool Send(uint8_t type , uint8_t Commands , float *data){
+                if(xSemaphoreTake(Amutex, portMAX_DELAY) != pdTRUE){
+                    Serial.println("com: Failed to take mutex");
+                    return false;
+                }
+                Command.clear();
+                Command.push_back(0xCC); // Head
+                Command.push_back(type); // Message type
+                Command.push_back(Commands); // Command
+                uint8_t dataLength = sizeof(data);
+                Command.push_back(dataLength); // Data length
+
+                uint8_t* ByteArray = new uint8_t[dataLength * sizeof(float)];
+                for(int i = 0; i < dataLength / 4; i++) {
+                    uint8_t* temp = new uint8_t[4];
+                    temp = ToByte(data[i]);
+                    memcpy(ByteArray + i * sizeof(float), temp, sizeof(float));
+                    delete[] temp; // Free the temporary byte array
+                }
+
+                for(uint8_t i = 0; i < dataLength; i++) {
+                    Command.push_back(ByteArray[i]);
+                }
+                delete[] ByteArray; // Free the byte array after use
+                uint8_t verify = OddVerify(Command);
+                Command.push_back(0xFF); // Add verification byte
+                Command.push_back(verify); // Add verification byte
+                SendCommand(); // Send the command
+                Command.clear(); // Clear the command after sending
+                xSemaphoreGive(Amutex);
+                return true; // Return true if command sent successfully
+            }
+
+
+
     };
